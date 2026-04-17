@@ -1,0 +1,120 @@
+/* ===== GLOBAL ===== */
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f4f6f9;
+}
+
+/* ===== LEFT PANEL ===== */
+.left-panel {
+    background: linear-gradient(135deg, #0d6efd, #3c8cff);
+    color: white;
+}
+
+/* ===== LEFT CONTENT ===== */
+.left-content {
+    text-align: center;
+    max-width: 400px;
+}
+
+.left-content h1 {
+    font-size: 40px;
+    font-weight: 600;
+}
+
+.left-content p {
+    opacity: 0.9;
+    font-size: 16px;
+}
+
+/* ===== FORM SIDE ===== */
+.form-box {
+    width: 400px;
+}
+
+.form-title {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+/* ===== INPUT ===== */
+.form-control {
+    padding: 10px;
+    border-radius: 6px;
+}
+
+/* ===== BUTTON ===== */
+.btn-primary {
+    background-color: #0d6efd;
+    border: none;
+    padding: 10px;
+    font-weight: 500;
+}
+
+/* ===== AUTH BOX ===== */
+.auth-box {
+    width: 350px;
+    padding: 30px;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.08);
+}
+
+/* ===== TEXT ===== */
+.error-text {
+    color: red;
+    text-align: center;
+}
+
+.success-text {
+    color: green;
+    text-align: center;
+}
+
+/* ===== QR PAGE ===== */
+.qr-container {
+    text-align: center;
+    padding-top: 60px;
+}
+
+.qr-container img {
+    width: 220px;
+    margin: 20px 0;
+}
+
+/* ===== INPUT FOCUS EFFECT ===== */
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 5px rgba(13, 110, 253, 0.3);
+}
+
+/* ===== BUTTON HOVER ===== */
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    transform: translateY(-1px);
+}
+
+/* ===== LEFT PANEL ENHANCEMENT ===== */
+.left-panel {
+    background: linear-gradient(135deg, #0d6efd, #3c8cff);
+    color: white;
+    position: relative;
+}
+
+/* subtle overlay effect */
+.left-panel::after {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    top: 20%;
+    left: 10%;
+}
+
+/* ===== TRANSITION ===== */
+.form-control, .btn {
+    transition: all 0.2s ease;
+}

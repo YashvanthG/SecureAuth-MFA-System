@@ -71,7 +71,7 @@ def log_activity(username, action, status):
 
 @app.route('/')
 def home():
-    return render_template('login.html')
+    return redirect(url_for('login'))
 
 # -------------------- REGISTER --------------------
 
@@ -152,24 +152,20 @@ def verify_totp_route():
     attempts = session.get('totp_attempts', 0)
     start_time = session.get('totp_start_time', time.time())
 
-    # ⏱️ Expiry
     if time.time() - start_time > 90:
         log_activity(user, "TOTP", "EXPIRED")
         return render_template('totp.html',
-                               error="Session expired ⏱️. Please use Email OTP.",
+                               error="Session expired ⏱️. Use Email OTP.",
                                show_fallback=True)
 
-    # ✅ Correct OTP
+    # ✅ CHECK FIRST
     if verify_totp(user, code):
         log_activity(user, "TOTP", "SUCCESS")
 
-        session.clear()
-        session['user'] = user
+        session['temp_user'] = user  # keep user for next step
+        return redirect(url_for('send_email_otp'))
 
-        log_activity(user, "LOGIN", "SUCCESS")
-        return redirect(url_for('dashboard'))
-
-    # ❌ Wrong OTP
+    # ❌ FAILED
     attempts += 1
     session['totp_attempts'] = attempts
 
@@ -184,7 +180,7 @@ def verify_totp_route():
                            error=f"Invalid TOTP ({attempts}/3)",
                            show_fallback=False)
 
-# -------------------- EMAIL OTP SEND --------------------
+# -------------------- EMAIL OTP SEND / RESEND --------------------
 
 @app.route('/send-email-otp', methods=['GET', 'POST'])
 def send_email_otp():
@@ -193,9 +189,11 @@ def send_email_otp():
     if not user:
         return redirect(url_for('login'))
 
+    # GET → confirm page
     if request.method == 'GET':
         return render_template('confirm_otp.html')
 
+    # POST → SEND / RESEND OTP
     conn = get_db()
     cursor = conn.cursor()
 
@@ -207,11 +205,16 @@ def send_email_otp():
         return "User not found"
 
     email = result[0]
+
     otp = str(random.randint(1000, 9999))
 
+    # ✅ STORE
     session['otp'] = otp
     session['otp_expiry'] = time.time() + 120
     session['user'] = user
+
+    # 🔥 RESET ATTEMPTS ON RESEND
+    session['otp_attempts'] = 0
 
     send_otp_email(email, otp)
     log_activity(user, "EMAIL_OTP", "SENT")
@@ -236,7 +239,7 @@ def verify_email_otp():
 
     if time.time() > expiry:
         log_activity(user, "EMAIL_OTP", "EXPIRED")
-        return "OTP Expired ❌"
+        return render_template('otp.html', error="OTP Expired ❌")
 
     if user_otp == session_otp:
         log_activity(user, "EMAIL_OTP", "SUCCESS")
@@ -258,9 +261,9 @@ def dashboard():
     if not user:
         return redirect(url_for('login'))
 
-    return render_template("dashboard.html", username=user)
+    return render_template('dashboard.html', username=user)
 
-# -------------------- LOGS VIEW --------------------
+# -------------------- LOGS --------------------
 
 @app.route('/logs/<username>')
 def view_logs(username):

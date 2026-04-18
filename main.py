@@ -15,7 +15,7 @@ app.secret_key = "supersecretkey"
 # -------------------- DB --------------------
 
 def get_db():
-    return sqlite3.connect("database.db")
+    return sqlite3.connect("database.db", check_same_thread=False)
 
 def init_db():
     conn = get_db()
@@ -46,6 +46,9 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# ✅ IMPORTANT: call AFTER definition
+init_db()
 
 # -------------------- LOGGING --------------------
 
@@ -153,14 +156,12 @@ def verify_totp_route():
     attempts = session.get('totp_attempts', 0)
     start_time = session.get('totp_start_time', time.time())
 
-    # ⏱ TIME EXPIRED
     if time.time() - start_time > 90:
         log_activity(user, "TOTP", "EXPIRED")
         return render_template('totp.html',
                                error="Session expired ⏱️. Use Email OTP.",
                                show_fallback=True)
 
-    # ✅ SUCCESS → GO TO DASHBOARD (FIXED MAIN BUG)
     if verify_totp(user, code):
         log_activity(user, "TOTP", "SUCCESS")
 
@@ -171,7 +172,6 @@ def verify_totp_route():
 
         return redirect(url_for('dashboard'))
 
-    # ❌ FAILED
     attempts += 1
     session['totp_attempts'] = attempts
 
@@ -186,7 +186,7 @@ def verify_totp_route():
                            error=f"Invalid TOTP ({attempts}/3)",
                            show_fallback=False)
 
-# -------------------- EMAIL OTP SEND --------------------
+# -------------------- EMAIL OTP --------------------
 
 @app.route('/send-email-otp', methods=['GET', 'POST'])
 def send_email_otp():
@@ -222,7 +222,7 @@ def send_email_otp():
 
     return render_template('otp.html', error=None)
 
-# -------------------- EMAIL OTP VERIFY --------------------
+# -------------------- VERIFY EMAIL OTP --------------------
 
 @app.route('/verify-otp', methods=['POST'])
 def verify_email_otp():
@@ -294,5 +294,4 @@ def logout():
 # -------------------- RUN --------------------
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True)

@@ -104,7 +104,7 @@ BREVO_API_KEY=your_api_key
 SENDER_EMAIL=your_verified_email  
 
 5. Run the application  
-python app.py  
+python main.py  
 
 ---
 

@@ -10,27 +10,67 @@
 <body>
 
 <!-- TOP BAR -->
-<div class="d-flex justify-content-between align-items-center p-3 bg-white shadow-sm">
-    <h5 class="mb-0">🔐 SecureAuth Dashboard</h5>
+<div class="top-bar">
+    <span>🔐 SecureAuth Dashboard</span>
 
     <div>
         <a href="/logout" class="btn btn-sm btn-outline-secondary">Logout</a>
     </div>
 </div>
 
-<div class="container mt-5 text-center">
+<!-- MAIN -->
+<div class="container mt-5">
 
-    <h3>Welcome, {{ username }} 👋</h3>
-    <p class="text-muted">Your system is secured with Multi-Factor Authentication</p>
+    <!-- WELCOME -->
+    <div class="text-center mb-5">
+        <h3>Welcome, {{ username }} 👋</h3>
+        <p class="text-muted">
+            Your account is protected with Multi-Factor Authentication
+        </p>
+    </div>
 
-    <div class="row mt-4 justify-content-center">
+    <!-- SECURITY STATUS -->
+    <div class="info-box mb-4">
+        <strong>🔐 Security Status</strong><br><br>
 
-        <!-- VIEW LOGS -->
-        <div class="col-md-4">
-            <div class="card shadow-sm p-3">
+        ✔ TOTP Authentication Enabled<br>
+        ✔ Email OTP Backup Active<br>
+        ✔ Activity Logging Enabled<br>
+        ✔ Brute-force Protection Active
+    </div>
+
+    <!-- ACTION CARDS -->
+    <div class="row">
+
+        <!-- LOGS -->
+        <div class="col-md-6 mb-4">
+            <div class="auth-box text-center">
+
                 <h5>📊 Activity Logs</h5>
-                <p class="text-muted">View your login and security activity</p>
-                <a href="/logs/{{ username }}" class="btn btn-primary">View Logs</a>
+                <p class="text-muted">
+                    View your recent authentication activity
+                </p>
+
+                <a href="/logs/{{ username }}" class="btn btn-primary w-100">
+                    View Logs
+                </a>
+
+            </div>
+        </div>
+
+        <!-- SYSTEM INFO -->
+        <div class="col-md-6 mb-4">
+            <div class="auth-box text-center">
+
+                <h5>🛡 System Protection</h5>
+                <p class="text-muted">
+                    Your account is secured using advanced authentication
+                </p>
+
+                <button class="btn btn-outline-success w-100" disabled>
+                    Protected ✅
+                </button>
+
             </div>
         </div>
 

@@ -19,8 +19,8 @@ def register_user(username, password, email):
         conn.commit()
         return totp_secret
 
-    except sqlite3.IntegrityError:   # ✅ specific error
-        return "Username already exists"
+    except sqlite3.IntegrityError:
+        return "USERNAME_EXISTS"   # ✅ standardized
 
     finally:
         conn.close()
@@ -32,23 +32,29 @@ def login_user(username, password):
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, username, password, email, totp_secret, attempts, is_blocked FROM users WHERE username=?", (username,))
+    cursor.execute("""
+        SELECT username, password, attempts, is_blocked
+        FROM users
+        WHERE username=?
+    """, (username,))
+
     user = cursor.fetchone()
 
+    # ❌ USER NOT FOUND
     if not user:
         conn.close()
         return "USER_NOT_FOUND", None, None
 
-    stored_password = user[2]
-    attempts = user[5]
-    is_blocked = user[6]
+    stored_password = user[1]
+    attempts = user[2]
+    is_blocked = user[3]
 
-    # 🔒 Check if blocked
-    if is_blocked:
+    # 🔒 ACCOUNT BLOCKED
+    if is_blocked == 1:
         conn.close()
-        return "Account is BLOCKED", None, None
+        return "BLOCKED", None, None
 
-    # 🔑 Password correct
+    # ✅ PASSWORD CORRECT
     if bcrypt.checkpw(password.encode('utf-8'), stored_password):
         cursor.execute("UPDATE users SET attempts=0 WHERE username=?", (username,))
         conn.commit()
@@ -56,24 +62,28 @@ def login_user(username, password):
 
         return "TOTP_REQUIRED", None, username
 
-    # ❌ Wrong password
+    # ❌ WRONG PASSWORD
     attempts += 1
 
     if attempts >= 3:
-        cursor.execute(
-            "UPDATE users SET attempts=?, is_blocked=1 WHERE username=?",
-            (attempts, username)
-        )
+        cursor.execute("""
+            UPDATE users
+            SET attempts=?, is_blocked=1
+            WHERE username=?
+        """, (attempts, username))
+
         conn.commit()
         conn.close()
 
         return "BLOCKED", None, None
 
     else:
-        cursor.execute(
-            "UPDATE users SET attempts=? WHERE username=?",
-            (attempts, username)
-        )
+        cursor.execute("""
+            UPDATE users
+            SET attempts=?
+            WHERE username=?
+        """, (attempts, username))
+
         conn.commit()
         conn.close()
 

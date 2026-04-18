@@ -12,12 +12,10 @@ import random
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
-# -------------------- DB HELPER --------------------
+# -------------------- DB --------------------
 
 def get_db():
     return sqlite3.connect("database.db")
-
-# -------------------- DATABASE INIT --------------------
 
 def init_db():
     conn = get_db()
@@ -67,7 +65,7 @@ def log_activity(username, action, status):
     except:
         pass
 
-# -------------------- ROUTES --------------------
+# -------------------- HOME --------------------
 
 @app.route('/')
 def home():
@@ -79,15 +77,14 @@ def home():
 def register():
     if request.method == 'POST':
         username = request.form['username']
+        password = request.form['password']
+        email = request.form['email']
 
-        secret = register_user(
-            username,
-            request.form['password'],
-            request.form['email']
-        )
+        secret = register_user(username, password, email)
 
-        if secret == "Username already exists":
-            return "Username already exists ❌"
+        if secret == "USERNAME_EXISTS":
+            return render_template('register.html',
+                                   error="Username already exists ❌")
 
         log_activity(username, "REGISTER", "SUCCESS")
 
@@ -101,7 +98,7 @@ def register():
 
         return render_template("qr.html", qr=img_str)
 
-    return render_template('register.html')
+    return render_template('register.html', error=None)
 
 # -------------------- LOGIN --------------------
 
@@ -109,10 +106,11 @@ def register():
 def login():
     if request.method == 'POST':
         username = request.form['username']
+        password = request.form['password']
 
         log_activity(username, "LOGIN_ATTEMPT", "START")
 
-        result, _, user = login_user(username, request.form['password'])
+        result, _, user = login_user(username, password)
 
         if result == "TOTP_REQUIRED":
             log_activity(user, "PASSWORD", "SUCCESS")
@@ -126,18 +124,21 @@ def login():
 
         elif result == "BLOCKED":
             log_activity(username, "LOGIN", "BLOCKED")
-            return "Account BLOCKED ❌"
+            return render_template('login.html',
+                                   error="Account is blocked ❌")
 
         elif result.startswith("INVALID"):
-            log_activity(username, "PASSWORD", "FAILED")
             attempts = result.split("_")[1]
-            return f"Invalid Credentials ({attempts}/3)"
+            log_activity(username, "PASSWORD", "FAILED")
+            return render_template('login.html',
+                                   error=f"Invalid credentials ({attempts}/3)")
 
         elif result == "USER_NOT_FOUND":
             log_activity(username, "LOGIN", "USER_NOT_FOUND")
-            return "User not found"
+            return render_template('login.html',
+                                   error="User not found ❌")
 
-    return render_template('login.html')
+    return render_template('login.html', error=None)
 
 # -------------------- TOTP VERIFY --------------------
 
@@ -152,18 +153,23 @@ def verify_totp_route():
     attempts = session.get('totp_attempts', 0)
     start_time = session.get('totp_start_time', time.time())
 
+    # ⏱ TIME EXPIRED
     if time.time() - start_time > 90:
         log_activity(user, "TOTP", "EXPIRED")
         return render_template('totp.html',
                                error="Session expired ⏱️. Use Email OTP.",
                                show_fallback=True)
 
-    # ✅ CHECK FIRST
+    # ✅ SUCCESS → GO TO DASHBOARD (FIXED MAIN BUG)
     if verify_totp(user, code):
         log_activity(user, "TOTP", "SUCCESS")
 
-        session['temp_user'] = user  # keep user for next step
-        return redirect(url_for('send_email_otp'))
+        session.clear()
+        session['user'] = user
+
+        log_activity(user, "LOGIN", "SUCCESS")
+
+        return redirect(url_for('dashboard'))
 
     # ❌ FAILED
     attempts += 1
@@ -180,7 +186,7 @@ def verify_totp_route():
                            error=f"Invalid TOTP ({attempts}/3)",
                            show_fallback=False)
 
-# -------------------- EMAIL OTP SEND / RESEND --------------------
+# -------------------- EMAIL OTP SEND --------------------
 
 @app.route('/send-email-otp', methods=['GET', 'POST'])
 def send_email_otp():
@@ -189,11 +195,9 @@ def send_email_otp():
     if not user:
         return redirect(url_for('login'))
 
-    # GET → confirm page
     if request.method == 'GET':
         return render_template('confirm_otp.html')
 
-    # POST → SEND / RESEND OTP
     conn = get_db()
     cursor = conn.cursor()
 
@@ -202,24 +206,21 @@ def send_email_otp():
     conn.close()
 
     if not result:
-        return "User not found"
+        return render_template('login.html',
+                               error="User not found ❌")
 
     email = result[0]
-
     otp = str(random.randint(1000, 9999))
 
-    # ✅ STORE
     session['otp'] = otp
     session['otp_expiry'] = time.time() + 120
     session['user'] = user
-
-    # 🔥 RESET ATTEMPTS ON RESEND
     session['otp_attempts'] = 0
 
     send_otp_email(email, otp)
     log_activity(user, "EMAIL_OTP", "SENT")
 
-    return render_template('otp.html')
+    return render_template('otp.html', error=None)
 
 # -------------------- EMAIL OTP VERIFY --------------------
 
@@ -281,7 +282,7 @@ def view_logs(username):
     logs = cursor.fetchall()
     conn.close()
 
-    return render_template("logs.html", logs=logs, username=username)
+    return render_template('logs.html', logs=logs, username=username)
 
 # -------------------- LOGOUT --------------------
 

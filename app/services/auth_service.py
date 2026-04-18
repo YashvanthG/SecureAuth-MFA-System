@@ -20,7 +20,7 @@ def register_user(username, password, email):
         return totp_secret
 
     except sqlite3.IntegrityError:
-        return "USERNAME_EXISTS"   # ✅ standardized
+        return "USERNAME_EXISTS"
 
     finally:
         conn.close()
@@ -40,7 +40,6 @@ def login_user(username, password):
 
     user = cursor.fetchone()
 
-    # ❌ USER NOT FOUND
     if not user:
         conn.close()
         return "USER_NOT_FOUND", None, None
@@ -49,20 +48,16 @@ def login_user(username, password):
     attempts = user[2]
     is_blocked = user[3]
 
-    # 🔒 ACCOUNT BLOCKED
     if is_blocked == 1:
         conn.close()
         return "BLOCKED", None, None
 
-    # ✅ PASSWORD CORRECT
     if bcrypt.checkpw(password.encode('utf-8'), stored_password):
         cursor.execute("UPDATE users SET attempts=0 WHERE username=?", (username,))
         conn.commit()
         conn.close()
-
         return "TOTP_REQUIRED", None, username
 
-    # ❌ WRONG PASSWORD
     attempts += 1
 
     if attempts >= 3:
@@ -71,10 +66,8 @@ def login_user(username, password):
             SET attempts=?, is_blocked=1
             WHERE username=?
         """, (attempts, username))
-
         conn.commit()
         conn.close()
-
         return "BLOCKED", None, None
 
     else:
@@ -83,8 +76,6 @@ def login_user(username, password):
             SET attempts=?
             WHERE username=?
         """, (attempts, username))
-
         conn.commit()
         conn.close()
-
         return f"INVALID_{attempts}", None, None

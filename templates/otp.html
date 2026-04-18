@@ -43,9 +43,9 @@
                    required
                    style="font-size: 22px; letter-spacing: 10px;">
 
-            <div class="input-hint mb-3">
-                OTP is valid for 2 minutes
-            </div>
+            <!-- 🔥 LIVE TIMERS -->
+            <div id="timer" class="text-muted mb-1"></div>
+            <div id="resend-timer" class="text-muted mb-3"></div>
 
             <button type="submit" class="btn btn-primary w-100">
                 Verify OTP
@@ -70,6 +70,37 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+<!-- 🔥 TIMER SCRIPT -->
+<script>
+    const expiry = {{ expiry|default(0) }};
+    const lastSent = {{ last_sent|default(0) }};
+
+    function updateTimers() {
+        const now = Math.floor(Date.now() / 1000);
+
+        // OTP expiry timer
+        let remaining = Math.max(0, Math.floor(expiry - now));
+        let min = Math.floor(remaining / 60);
+        let sec = remaining % 60;
+
+        document.getElementById("timer").innerText =
+            "OTP expires in: " + min + ":" + (sec < 10 ? "0" : "") + sec;
+
+        // resend cooldown
+        let resendLeft = Math.max(0, 30 - (now - lastSent));
+        if (resendLeft > 0) {
+            document.getElementById("resend-timer").innerText =
+                "Resend available in: " + resendLeft + "s";
+        } else {
+            document.getElementById("resend-timer").innerText =
+                "You can resend OTP now";
+        }
+    }
+
+    setInterval(updateTimers, 1000);
+    updateTimers();
+</script>
 
 </body>
 </html>

@@ -41,9 +41,8 @@
                    pattern="\d{6}"
                    required>
 
-            <div class="input-hint mb-3">
-                Code refreshes every 30 seconds
-            </div>
+            <!-- 🔥 TIMER -->
+            <div id="totp-timer" class="text-muted mb-3"></div>
 
             <button type="submit" class="btn btn-primary w-100">
                 Verify
@@ -71,6 +70,20 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+<!-- 🔥 TOTP TIMER SCRIPT -->
+<script>
+    function updateTOTP() {
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = 30 - (now % 30);
+
+        document.getElementById("totp-timer").innerText =
+            "Code refreshes in: " + remaining + "s";
+    }
+
+    setInterval(updateTOTP, 1000);
+    updateTOTP();
+</script>
 
 </body>
 </html>

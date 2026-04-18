@@ -28,6 +28,7 @@ def init_db():
         password BLOB,
         email TEXT,
         totp_secret TEXT,
+        totp_enabled INTEGER DEFAULT 0,
         attempts INTEGER DEFAULT 0,
         is_blocked INTEGER DEFAULT 0
     )
@@ -47,7 +48,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ✅ IMPORTANT: call AFTER definition
 init_db()
 
 # -------------------- LOGGING --------------------
@@ -91,6 +91,8 @@ def register():
 
         log_activity(username, "REGISTER", "SUCCESS")
 
+        session['temp_user'] = username
+
         uri = f"otpauth://totp/SecureAuthApp:{username}?secret={secret}&issuer=SecureAuthApp"
 
         qr = qrcode.make(uri)
@@ -99,9 +101,55 @@ def register():
 
         img_str = base64.b64encode(buffer.getvalue()).decode()
 
-        return render_template("qr.html", qr=img_str)
+        return render_template("qr.html", qr=img_str, error=None)
 
     return render_template('register.html', error=None)
+
+# -------------------- VERIFY SETUP TOTP --------------------
+
+@app.route('/verify-setup-totp', methods=['POST'])
+def verify_setup_totp():
+    user = session.get('temp_user')
+
+    if not user:
+        return redirect(url_for('login'))
+
+    code = request.form['code']
+
+    if verify_totp(user, code):
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE users SET totp_enabled=1 WHERE username=?
+        """, (user,))
+
+        conn.commit()
+        conn.close()
+
+        log_activity(user, "TOTP_SETUP", "SUCCESS")
+
+        session.clear()
+        session['user'] = user
+
+        return redirect(url_for('dashboard'))
+
+    log_activity(user, "TOTP_SETUP", "FAILED")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT totp_secret FROM users WHERE username=?", (user,))
+    secret = cursor.fetchone()[0]
+    conn.close()
+
+    uri = f"otpauth://totp/SecureAuthApp:{user}?secret={secret}&issuer=SecureAuthApp"
+
+    qr = qrcode.make(uri)
+    buffer = io.BytesIO()
+    qr.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+
+    return render_template("qr.html", qr=img_str, error="Invalid code ❌")
 
 # -------------------- LOGIN --------------------
 
@@ -118,8 +166,32 @@ def login():
         if result == "TOTP_REQUIRED":
             log_activity(user, "PASSWORD", "SUCCESS")
 
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT totp_enabled, totp_secret 
+                FROM users WHERE username=?
+            """, (user,))
+            data = cursor.fetchone()
+            conn.close()
+
+            totp_enabled = data[0]
+            secret = data[1]
+
             session.clear()
             session['temp_user'] = user
+
+            if totp_enabled == 0:
+                uri = f"otpauth://totp/SecureAuthApp:{user}?secret={secret}&issuer=SecureAuthApp"
+
+                qr = qrcode.make(uri)
+                buffer = io.BytesIO()
+                qr.save(buffer, format="PNG")
+                img_str = base64.b64encode(buffer.getvalue()).decode()
+
+                return render_template("qr.html", qr=img_str,
+                                       error="Please complete setup first 🔐")
+
             session['totp_attempts'] = 0
             session['totp_start_time'] = time.time()
 
@@ -128,7 +200,7 @@ def login():
         elif result == "BLOCKED":
             log_activity(username, "LOGIN", "BLOCKED")
             return render_template('login.html',
-                                   error="Account is blocked ❌")
+                                   error="Account blocked ❌")
 
         elif result.startswith("INVALID"):
             attempts = result.split("_")[1]
@@ -198,9 +270,18 @@ def send_email_otp():
     if request.method == 'GET':
         return render_template('confirm_otp.html')
 
+    last_sent = session.get('last_otp_time')
+    if last_sent and time.time() - last_sent < 30:
+        remaining = int(30 - (time.time() - last_sent))
+        return render_template(
+            'otp.html',
+            error=f"Wait {remaining}s before requesting again ⏱",
+            expiry=session.get('otp_expiry'),
+            last_sent=session.get('last_otp_time')
+        )
+
     conn = get_db()
     cursor = conn.cursor()
-
     cursor.execute("SELECT email FROM users WHERE username=?", (user,))
     result = cursor.fetchone()
     conn.close()
@@ -216,11 +297,17 @@ def send_email_otp():
     session['otp_expiry'] = time.time() + 120
     session['user'] = user
     session['otp_attempts'] = 0
+    session['last_otp_time'] = time.time()
 
     send_otp_email(email, otp)
     log_activity(user, "EMAIL_OTP", "SENT")
 
-    return render_template('otp.html', error=None)
+    return render_template(
+        'otp.html',
+        error=None,
+        expiry=session.get('otp_expiry'),
+        last_sent=session.get('last_otp_time')
+    )
 
 # -------------------- VERIFY EMAIL OTP --------------------
 
@@ -234,13 +321,24 @@ def verify_email_otp():
     user_otp = request.form['otp']
     session_otp = session.get('otp')
     expiry = session.get('otp_expiry')
+    attempts = session.get('otp_attempts', 0)
 
     if not session_otp or not expiry:
         return redirect(url_for('login'))
 
     if time.time() > expiry:
         log_activity(user, "EMAIL_OTP", "EXPIRED")
-        return render_template('otp.html', error="OTP Expired ❌")
+        return render_template('otp.html',
+                               error="OTP Expired ❌",
+                               expiry=expiry,
+                               last_sent=session.get('last_otp_time'))
+
+    if attempts >= 3:
+        log_activity(user, "EMAIL_OTP", "BLOCKED")
+        return render_template('otp.html',
+                               error="Too many attempts ❌ Please resend OTP",
+                               expiry=expiry,
+                               last_sent=session.get('last_otp_time'))
 
     if user_otp == session_otp:
         log_activity(user, "EMAIL_OTP", "SUCCESS")
@@ -250,8 +348,14 @@ def verify_email_otp():
 
         return redirect(url_for('dashboard'))
 
+    attempts += 1
+    session['otp_attempts'] = attempts
+
     log_activity(user, "EMAIL_OTP", "FAILED")
-    return render_template('otp.html', error="Invalid OTP ❌")
+    return render_template('otp.html',
+                           error=f"Invalid OTP ({attempts}/3)",
+                           expiry=expiry,
+                           last_sent=session.get('last_otp_time'))
 
 # -------------------- DASHBOARD --------------------
 

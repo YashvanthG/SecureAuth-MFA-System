@@ -11,51 +11,60 @@
 
 <!-- TOP BAR -->
 <div class="top-bar">
-    <span>🔐 MFA Setup</span>
+    <span>🔐 MFA Setup Required</span>
     <a href="/logout" class="btn btn-sm btn-outline-secondary">Logout</a>
 </div>
 
 <!-- CENTER CONTENT -->
 <div class="d-flex justify-content-center align-items-center" style="height: 85vh;">
 
-    <div class="auth-box">
+    <div class="auth-box text-center">
 
-        <h4>🔐 Setup Authenticator</h4>
+        <h4>🔐 Complete Security Setup</h4>
         <p class="text-muted">
-            Scan this QR code using your authenticator app
+            You must finish setup before logging in
         </p>
 
-        <!-- QR IMAGE -->
+        <!-- QR -->
         <img src="data:image/png;base64,{{ qr }}" 
              alt="QR Code"
-             style="width: 220px; margin: 15px 0;">
+             style="width: 200px; margin: 15px 0;">
 
         <!-- STEPS -->
         <div class="text-start mt-3" style="font-size: 14px;">
             <strong>Steps:</strong>
             <ul>
                 <li>Open Google Authenticator</li>
-                <li>Tap the "+" icon</li>
-                <li>Select "Scan QR Code"</li>
-                <li>Scan the QR above</li>
+                <li>Tap "+" → Scan QR</li>
+                <li>Enter the 6-digit code below</li>
             </ul>
         </div>
 
-        <div class="input-hint mt-2">
-            After setup, use the generated 6-digit code during login
-        </div>
+        <!-- 🔥 IMPORTANT: INPUT -->
+        <form method="POST" action="/verify-setup-totp" class="mt-4">
 
-        <!-- ACTIONS -->
-        <div class="mt-4">
+            <input type="text"
+                   name="code"
+                   class="form-control text-center mb-3"
+                   placeholder="Enter 6-digit code"
+                   maxlength="6"
+                   pattern="\d{6}"
+                   required>
 
-            <a href="/login" class="btn btn-primary w-100 mb-2">
-                Go to Login
-            </a>
+            <button type="submit" class="btn btn-primary w-100">
+                Verify & Activate
+            </button>
 
-            <a href="/register" class="btn btn-outline-secondary w-100">
-                ← Back to Register
-            </a>
+        </form>
 
+        <!-- ERROR -->
+        {% if error %}
+            <div class="error-text mt-2">{{ error }}</div>
+        {% endif %}
+
+        <!-- INFO -->
+        <div class="input-hint mt-3">
+            ⏱ Code refreshes every 30 seconds
         </div>
 
     </div>

@@ -21,11 +21,11 @@
             <div class="info-box text-start mt-4">
                 <strong>Security Features</strong><br><br>
 
-                • TOTP-based authentication<br>
+                • Multi-Factor Authentication (TOTP + Email OTP)<br>
                 • Secure password hashing (bcrypt)<br>
                 • Time-based OTP expiry<br>
-                • Brute-force protection<br>
-                • Activity logging system
+                • Temporary account lock (anti brute-force)<br>
+                • Activity logging & monitoring
             </div>
 
         </div>
@@ -76,6 +76,11 @@
                 </button>
 
             </form>
+
+            <!-- 🔥 NEW: Helpful Info -->
+            <div class="mt-3 text-center" style="font-size: 14px; color: #666;">
+                If your account is temporarily locked, please wait a few minutes and try again.
+            </div>
 
             <p class="text-center mt-3">
                 New user? <a href="/register">Create account</a>
